@@ -159,7 +159,7 @@ class ModelConfig(MIIConfigModel):
     first will use port 29500 and the second will use port 29600.
     """
 
-    zmq_port_number: int = 25555
+    zmq_port_number: int = 35555
     """
     Port number to use for the ZMQ communication (for broadcasting requests and
     responses among all ranks in ragged batching).

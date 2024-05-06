@@ -1,5 +1,6 @@
 import argparse
 import mii
+import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="/datadisk/share/llama2-7b", help="model name or path.")
@@ -20,15 +21,17 @@ pipe = mii.pipeline(
     args.model,
     tensor_parallel=args.tp,
     skip_decode=args.skip_decode,
+    profile_model_time=True,
 )
 
 inputs = args.prompts
+inputs = torch.load("test_samples.pkl")
 # inputs = [pipe.tokenizer.encode(input) for input in inputs]
 # print(f"inputs::{inputs}", flush=True)
 
 responses = pipe(
     inputs,
-    max_new_tokens=args.max_new_tokens,
+    # max_new_tokens=args.max_new_tokens,
     do_sample=False,  # Greedy
     # return_full_text=True,
 )

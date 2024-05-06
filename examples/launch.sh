@@ -3,8 +3,8 @@
 : ${TYPE=${1:-"pipeline"}}
 : ${TP=${2:-1}}
 : ${DP=${3:-1}}
-: ${MODEL:="/datadisk/share/llama2-7b"}
-: ${LAUNCH:="python"}
+: ${MODEL:="/datadisk/mlperf-llama2/model"}
+: ${LAUNCH:="mpi"}
 : ${SKIP_DECODE:=false}
 
 function set_env() {
@@ -42,21 +42,22 @@ function set_env() {
 }
 
 function main() {
-  # set_env
+  set_env
 
   case ${LAUNCH} in
   "mpi") CMD="mpirun -np ${TP} --prepend-rank python" ;;
+  "unitrace") CMD="mpirun -np ${TP} --prepend-rank unitrace --output-dir-path unitrace.llama.autotp.temp --chrome-call-logging --chrome-kernel-logging --chrome-device-logging --conditional-collection python" ;;
   "ipdb") CMD="ipdb3" ;;
   *) CMD="python -u" ;;
   esac
 
   case ${TYPE} in
-  "pipeline") CMD+=" non-persistent/pipeline.py --model ${MODEL} --tp ${TP}" ;;
-  "serve") CMD+=" persistent/serve.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
-  "client") CMD+=" persistent/client.py" ;;
-  "terminate") CMD+=" persistent/terminate.py" ;;
-  "oneshot") CMD+=" persistent/oneshot.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
-  "stream") CMD+=" persistent/stream.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
+  "pipeline") CMD+=" examples/non-persistent/pipeline.py --model ${MODEL} --tp ${TP}" ;;
+  "serve") CMD+=" examples/persistent/serve.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
+  "client") CMD+=" examples/persistent/client.py" ;;
+  "terminate") CMD+=" examples/persistent/terminate.py" ;;
+  "oneshot") CMD+=" examples/persistent/oneshot.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
+  "stream") CMD+=" examples/persistent/stream.py --model ${MODEL} --tp ${TP} --dp ${DP}" ;;
   esac
 
   [ ${SKIP_DECODE} == true ] && CMD+=" --skip_decode"

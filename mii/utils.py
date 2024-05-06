@@ -175,6 +175,14 @@ def generate_deployment_name(model_name_or_path: str):
 
 
 def init_distributed(model_config: "ModelConfig"):
+    local_rank = os.environ.get("MPI_LOCALRANKID", "0")
+    world_size = os.environ.get("PMI_SIZE", "1")
+    port = os.environ.get("MASTER_PORT", "29555")
+    os.environ["RANK"] = local_rank
+    os.environ["LOCAL_RANK"] = local_rank
+    os.environ["WORLD_SIZE"] = world_size
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = port
     # If not running with a distributed launcher (e.g., deepspeed, torch) set some default environment variables
     required_env = ["RANK", "WORLD_SIZE", "MASTER_ADDR", "MASTER_PORT", "LOCAL_RANK"]
     if not all([e in os.environ for e in required_env]):

@@ -92,6 +92,12 @@ class RaggedBatchBase:
 
     @profiler
     def generate(self) -> None:
+        if self._iters == 201:
+            os.environ["PTI_ENABLE_COLLECTION"] = "1"
+            print(">>> enable trace")
+        if self._iters == 210:
+            os.unsetenv("PTI_ENABLE_COLLECTION")
+            print(">>> disable trace")
         # 1. Get a batch of requests, broadcast to all ranks
         scheduled_requests = self._bcast_requests()
 
@@ -100,6 +106,9 @@ class RaggedBatchBase:
 
         # 3. Put new tokens into inference engine
         if scheduled_requests.requests_to_run:
+            if self.is_rank_0:
+                print(">>> scheduled_requests", len(scheduled_requests.requests_to_run), sum([len(r.input_tokens) for r in scheduled_requests.requests_to_run]))
+            self._iters += 1
             next_token_logits = self.put(
                 scheduled_requests.requests_to_run.uids,
                 scheduled_requests.requests_to_run.tokens,
@@ -132,6 +141,8 @@ class RaggedBatchBase:
                 r.set_next_as_input()
                 self.request_queue.put(r)
 
+        if self.is_rank_0 and len(running_requests.completed) > 0:
+            print(">>> running_requests.completed", [(r.prompt_length, r.num_generated_tokens) for r in running_requests.completed])
         # 7. Update scheduled requests
         self.scheduled_requests.prune(running_requests.completed.uids)
         self.schedule_requests()
@@ -140,14 +151,13 @@ class RaggedBatchBase:
             self._print_profiled_times()
 
     def _print_profiled_times(self) -> None:
-        self._iters += 1
         if not (self._iters % 100 == 0):
             return
         for event, times in self._profiled_times.items():
             mean_time = sum(times) / len(times)
             log_msg = f"{event}: {mean_time}"
             if event == "generate":
-                log_msg += f" ({self._num_generated_tokens / sum(times)} tokens/ms)"
+                log_msg += f" ({sum(times) / self._num_generated_tokens} ms/token)"
             logger.info(log_msg)
         self._profiled_times.clear()
         self._num_generated_tokens = 0
@@ -234,10 +244,12 @@ class RaggedBatchBase:
         conf_manager = self.inference_engine._config.state_manager
 
         num_schedulable = min([
-            len(requests),
+            self.scheduled_length + len(requests),
             conf_manager.max_ragged_sequence_count,
             conf_manager.max_ragged_batch_size
         ])
+        if num_schedulable != len(requests):
+            print(">>> token_gen hit max_ragged_sequence_count or max_batch_size", num_schedulable)
 
         for r in requests[:num_schedulable]:
             block_capacity = self.inference_engine.get_remaining_block_capacity(r.uid)
@@ -258,17 +270,21 @@ class RaggedBatchBase:
 
         for r in requests:
             if free_blocks == 0:
+                print(">>> no free blocks")
                 break
 
             if r.max_length <= r.seq_length:
+                print(">>> hit max_length")
                 continue
 
             # Make sure that the engine has enough capacity to process the batch
             if len(self.scheduled_requests.requests_to_run) >= conf_manager.max_ragged_sequence_count:
+                print(">>> hit max_ragged_sequence_count")
                 break
 
             max_batch_size = conf_manager.max_ragged_batch_size - self.scheduled_length
             if max_batch_size <= 0:
+                print(">>> hit max_batch_size")
                 break
 
             max_blocks = free_blocks - self.scheduled_req_blocks
@@ -279,12 +295,14 @@ class RaggedBatchBase:
                 # So we make sure that we have capacity for the entire prompt (+tokens already generated).
                 req_tokens, _ = self.inference_engine.query(r.uid, len(r.input_tokens), max_blocks)
                 if req_tokens < len(r.input_tokens):
+                    print(">>> unable to fill whole request token")
                     break
 
             req_tokens = min(len(r.input_tokens), max_batch_size)
             req_tokens, req_blocks = self.inference_engine.query(r.uid, req_tokens, max_blocks)
 
             if req_tokens <= 0:
+                print(">>> unable to fill part of the request token")
                 continue
 
             # Decompose the prompt to fit to the max ragged batch size
@@ -300,6 +318,7 @@ class RaggedBatchBase:
             self.scheduled_length += req_tokens
 
             if decomposed:
+                print(">>> request token is decomposed", req_tokens, len(remaining_tokens))
                 req_remaining = copy.copy(r)
                 req_remaining.input_tokens = remaining_tokens
                 req_remaining.seq_length = r.seq_length + req_tokens
@@ -482,7 +501,7 @@ class RaggedBatchBase:
 
     def put(self, uids: List[int], tokenized_input: List[torch.Tensor]) -> torch.Tensor:
         # Call inference engine. You can skip checking schedulability because we already checked when scheduling
-        return self.inference_engine.put(uids, tokenized_input, do_checks=False)
+        return self.inference_engine.put(uids, tokenized_input, do_checks=True)
 
     def flush(self, uids: List[int]) -> None:
         for uid in uids:
