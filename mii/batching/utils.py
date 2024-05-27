@@ -33,8 +33,9 @@ def profiler(func):
         self._timers(func.__name__).start()
         result = func(self, *args, **kwargs)
         self._timers(func.__name__).stop()
-        self._profiled_times[func.__name__].append(
-            self._timers(func.__name__).elapsed(reset=True))
+        elapsed_time = self._timers(func.__name__).elapsed(reset=True)
+        if elapsed_time > 0:
+            self._profiled_times[func.__name__].append(elapsed_time)
         return result
 
     return wrapper

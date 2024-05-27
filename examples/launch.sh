@@ -12,9 +12,9 @@ function set_env() {
   export HF_HOME=/datadisk/share/huggingface
 
   # >=2th round, set OFFLINE MODE and use the HF_HOME that 1th round set.
-  #export HF_DATASETS_OFFLINE=1
-  #export TRANSFORMERS_OFFLINE=1
-  #export HF_EVALUATE_OFFLINE=1
+  export HF_DATASETS_OFFLINE=1
+  export TRANSFORMERS_OFFLINE=1
+  export HF_EVALUATE_OFFLINE=1
   export TRANSFORMERS_CACHE=$HF_HOME/hub
   export TOKENIZERS_PARALLELISM=false
   #export ONECCL_BINDINGS_FOR_PYTORCH_ENV_VERBOSE=1

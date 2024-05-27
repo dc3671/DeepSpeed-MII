@@ -92,12 +92,12 @@ class RaggedBatchBase:
 
     @profiler
     def generate(self) -> None:
-        if self._iters == 201:
-            os.environ["PTI_ENABLE_COLLECTION"] = "1"
-            print(">>> enable trace")
-        if self._iters == 210:
-            os.unsetenv("PTI_ENABLE_COLLECTION")
-            print(">>> disable trace")
+        # if self._iters == 201:
+        #     os.environ["PTI_ENABLE_COLLECTION"] = "1"
+        #     print(">>> enable trace")
+        # if self._iters == 210:
+        #     os.unsetenv("PTI_ENABLE_COLLECTION")
+        #     print(">>> disable trace")
         # 1. Get a batch of requests, broadcast to all ranks
         scheduled_requests = self._bcast_requests()
 
